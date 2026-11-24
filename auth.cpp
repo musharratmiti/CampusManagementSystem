@@ -1,440 +1,338 @@
-// ============================================================
-// auth.cpp   -  MEMBER 1
-// Student Registration, Login, Logout, Profile,
-// Profile Edit, Password Management, User Role
-// ============================================================
-
 #include "auth.h"
-
-const string USERS_FILE = "users.txt";
-
-// Change this to your own university email ending
-const string EMAIL_DOMAIN = "@vu.edu";
-
-// ------------------------------------------------------------
-// File functions
-// users.txt line format:
-// studentId|fullName|email|department|semester|password|role
-// ------------------------------------------------------------
 
 vector<User> loadUsers() {
     vector<User> users;
-    ifstream file(USERS_FILE);
+    ifstream file("users.txt");
     string line;
 
     while (getline(file, line)) {
-        if (line == "") {
+        vector<string> p = splitLine(line);
+        if (p.size() < 7) {
             continue;
         }
-        vector<string> parts = splitLine(line);
-        if (parts.size() < 7) {
-            continue;
-        }
-
-        User user;
-        user.studentId = parts[0];
-        user.fullName = parts[1];
-        user.email = parts[2];
-        user.department = parts[3];
-        user.semester = stoi(parts[4]);
-        user.password = parts[5];
-        user.role = parts[6];
-        users.push_back(user);
+        User u;
+        u.id = p[0];
+        u.name = p[1];
+        u.email = p[2];
+        u.department = p[3];
+        u.semester = atoi(p[4].c_str());
+        u.password = p[5];
+        u.role = p[6];
+        users.push_back(u);
     }
-
     file.close();
     return users;
 }
 
 void saveUsers(vector<User> users) {
-    ofstream file(USERS_FILE);
-
+    ofstream file("users.txt");
     for (int i = 0; i < users.size(); i++) {
-        file << users[i].studentId << "|"
-             << users[i].fullName << "|"
-             << users[i].email << "|"
-             << users[i].department << "|"
-             << users[i].semester << "|"
-             << users[i].password << "|"
-             << users[i].role << "\n";
+        file << users[i].id << "|" << users[i].name << "|" << users[i].email << "|"
+             << users[i].department << "|" << users[i].semester << "|"
+             << users[i].password << "|" << users[i].role << "\n";
     }
-
     file.close();
 }
 
-// Replaces the old record of this user with the new one
 void updateUser(User user) {
     vector<User> users = loadUsers();
     for (int i = 0; i < users.size(); i++) {
-        if (users[i].studentId == user.studentId) {
+        if (users[i].id == user.id) {
             users[i] = user;
         }
     }
     saveUsers(users);
 }
 
-bool findUser(string studentId, User &foundUser) {
+bool findUser(string id, User &user) {
     vector<User> users = loadUsers();
     for (int i = 0; i < users.size(); i++) {
-        if (users[i].studentId == studentId) {
-            foundUser = users[i];
+        if (users[i].id == id) {
+            user = users[i];
             return true;
         }
     }
     return false;
 }
 
-// If no admin exists, make one: ID = admin, Password = admin123
-void createDefaultAdmin() {
-    vector<User> users = loadUsers();
-    for (int i = 0; i < users.size(); i++) {
-        if (users[i].role == "Admin") {
-            return;
-        }
-    }
-
-    User admin;
-    admin.studentId = "admin";
-    admin.fullName = "System Admin";
-    admin.email = "admin" + EMAIL_DOMAIN;
-    admin.department = "Administration";
-    admin.semester = 0;
-    admin.password = "admin123";
-    admin.role = "Admin";
-
-    users.push_back(admin);
-    saveUsers(users);
+bool hasBar(string text) {
+    return text.find('|') != string::npos;
 }
 
-// ------------------------------------------------------------
-// Small input helpers for this module
-// ------------------------------------------------------------
+int homeScreen() {
 
-string askEmail(string ownerId) {
-    while (true) {
-        string email = toLowerCase(inputText("University Email : "));
+    DrawRectangle(0, 0, 430, HEIGHT, COLOR_PRIMARY);
+    labelBold("Campus", 50, 170, 56, WHITE);
+    labelBold("Management", 50, 230, 56, WHITE);
+    labelBold("System", 50, 290, 56, WHITE);
+    Color lightText = {191, 219, 254, 255};
+    label("Booking  -  Lost & Found  -  Notices", 52, 370, 18, lightText);
+    label("Today: " + getTodayDate(), 52, 560, 18, lightText);
 
-        if (!endsWith(email, EMAIL_DOMAIN) || email.length() == EMAIL_DOMAIN.length()) {
-            cout << "  Email must end with " << EMAIL_DOMAIN << "\n";
-            continue;
-        }
+    drawCard(510, 140, 420, 380);
+    labelBold("Welcome!", 550, 175, 32, COLOR_TEXT);
+    label("Please choose an option", 550, 218, 18, COLOR_MUTED);
 
-        // check that no other user has this email
-        bool alreadyUsed = false;
-        vector<User> users = loadUsers();
-        for (int i = 0; i < users.size(); i++) {
-            if (users[i].email == email && users[i].studentId != ownerId) {
-                alreadyUsed = true;
-            }
-        }
-        if (alreadyUsed) {
-            cout << "  This email is already registered.\n";
-            continue;
-        }
-
-        return email;
+    if (button("Student Login", 550, 270, 340, 48)) {
+        return SCREEN_STUDENT_LOGIN;
     }
+    if (colorButton("Faculty Login", 550, 330, 340, 48, COLOR_TEAL)) {
+        return SCREEN_FACULTY_LOGIN;
+    }
+    if (colorButton("Create Account", 550, 390, 340, 48, COLOR_PURPLE)) {
+        return SCREEN_REGISTER;
+    }
+    if (colorButton("Exit", 550, 450, 340, 40, COLOR_MUTED)) {
+        return SCREEN_EXIT;
+    }
+    return SCREEN_HOME;
 }
 
-int askSemester() {
-    while (true) {
-        int semester = inputNumber("Semester (1-12)  : ");
-        if (semester >= 1 && semester <= 12) {
-            return semester;
-        }
-        cout << "  Semester must be between 1 and 12.\n";
-    }
+int regRole = 0;
+char regName[64] = "";
+char regId[32] = "";
+char regEmail[64] = "";
+char regDept[64] = "";
+char regSemester[8] = "";
+char regPassword[32] = "";
+
+void clearRegisterForm() {
+    regName[0] = '\0';
+    regId[0] = '\0';
+    regEmail[0] = '\0';
+    regDept[0] = '\0';
+    regSemester[0] = '\0';
+    regPassword[0] = '\0';
 }
 
-string askNewPassword() {
-    while (true) {
-        string password = inputText("New Password (min 6 characters): ");
-        if (password.length() < 6) {
-            cout << "  Password is too short.\n";
-            continue;
-        }
-
-        string confirm = inputText("Confirm Password               : ");
-        if (password != confirm) {
-            cout << "  Passwords do not match. Try again.\n";
-            continue;
-        }
-
-        return password;
+int registerScreen() {
+    drawHeader("Create Account", "Students and faculty");
+    if (backButton()) {
+        return SCREEN_HOME;
     }
-}
 
-// ------------------------------------------------------------
-// 1. Registration
-// ------------------------------------------------------------
+    drawCard(200, 100, 600, 450);
 
-void registerStudent() {
-    printTitle("STUDENT REGISTRATION");
+    label("Register as", 240, 125, 16, COLOR_MUTED);
+    toggleGroup("Student;Faculty", 240, 148, 160, 38, regRole);
 
-    User newUser;
-    newUser.fullName = inputText("Full Name        : ");
+    string idTitle = "Student ID";
+    if (regRole == 1) {
+        idTitle = "Faculty ID";
+    }
 
-    while (true) {
-        newUser.studentId = inputText("Student ID       : ");
+    textField("Full Name", regName, 64, 240, 205, 250, 1);
+    textField(idTitle, regId, 32, 510, 205, 250, 2);
+    textField("University Email", regEmail, 64, 240, 280, 250, 3);
+    textField("Department", regDept, 64, 510, 280, 250, 4);
+    if (regRole == 0) {
+        textField("Semester (1-12)", regSemester, 8, 240, 355, 250, 5);
+    }
+    passwordField("Password (min 4)", regPassword, 32, 510, 355, 250, 6);
+
+    if (button("Create Account", 240, 465, 520, 48)) {
+        string name = regName;
+        string id = regId;
+        string email = regEmail;
+        string dept = regDept;
+        string semester = regSemester;
+        string password = regPassword;
         User temp;
 
-        if (!isDigitsOnly(newUser.studentId)) {
-            cout << "  Student ID must contain digits only.\n";
-        } else if (findUser(newUser.studentId, temp)) {
-            cout << "  This Student ID is already registered.\n";
+        if (name == "" || id == "" || email == "" || dept == "" || password == "") {
+            showMessage("Please fill all the fields.", false);
+        } else if (hasBar(name + id + email + dept + password)) {
+            showMessage("Do not use the | character.", false);
+        } else if (findUser(id, temp)) {
+            showMessage("This ID is already registered.", false);
+        } else if (email.find('@') == string::npos) {
+            showMessage("Email must contain @", false);
+        } else if (regRole == 0 && (!isNumber(semester) || atoi(regSemester) < 1 || atoi(regSemester) > 12)) {
+            showMessage("Semester must be a number from 1 to 12.", false);
+        } else if (password.length() < 4) {
+            showMessage("Password must be at least 4 characters.", false);
         } else {
-            break;
+            User u;
+            u.id = id;
+            u.name = name;
+            u.email = email;
+            u.department = dept;
+            u.password = password;
+            if (regRole == 0) {
+                u.role = "Student";
+                u.semester = atoi(regSemester);
+            } else {
+                u.role = "Faculty";
+                u.semester = 0;
+            }
+
+            vector<User> users = loadUsers();
+            users.push_back(u);
+            saveUsers(users);
+
+            clearRegisterForm();
+            showMessage("Account created! You can login now.", true);
+            return SCREEN_HOME;
         }
     }
-
-    newUser.email = askEmail(newUser.studentId);
-    newUser.department = inputText("Department       : ");
-    newUser.semester = askSemester();
-    newUser.password = askNewPassword();
-    newUser.role = "Student";
-
-    vector<User> users = loadUsers();
-    users.push_back(newUser);
-    saveUsers(users);
-
-    cout << "\n  Registration successful! You can now login.\n";
-    pressEnter();
+    return SCREEN_REGISTER;
 }
 
-// ------------------------------------------------------------
-// 2. Login  (3 attempts allowed)
-// ------------------------------------------------------------
+char loginId[32] = "";
+char loginPassword[32] = "";
 
-bool loginUser(User &loggedUser) {
-    printTitle("LOGIN");
+int loginScreen(User &user, string role) {
+    drawHeader(role + " Login", "");
+    if (backButton()) {
+        loginId[0] = '\0';
+        loginPassword[0] = '\0';
+        return SCREEN_HOME;
+    }
 
-    int attempts = 0;
-    while (attempts < 3) {
-        string id = inputText("Student ID : ");
-        string password = inputText("Password   : ");
+    drawCard(300, 130, 400, 380);
+    labelBold("Welcome back", 340, 160, 30, COLOR_TEXT);
+    label("Login with your " + role + " ID", 340, 200, 18, COLOR_MUTED);
 
-        User user;
-        if (findUser(id, user) && user.password == password) {
-            loggedUser = user;
-            cout << "\n  Login successful! Welcome, " << user.fullName << ".\n";
-            pressEnter();
-            return true;
+    textField(role + " ID", loginId, 32, 340, 245, 320, 1);
+    passwordField("Password", loginPassword, 32, 340, 320, 320, 2);
+
+    Color color = COLOR_PRIMARY;
+    if (role == "Faculty") {
+        color = COLOR_TEAL;
+    }
+
+    if (colorButton("Login", 340, 420, 320, 48, color)) {
+        User u;
+        if (findUser(loginId, u) && u.password == loginPassword && u.role == role) {
+            user = u;
+            loginId[0] = '\0';
+            loginPassword[0] = '\0';
+            showMessage("Login successful! Welcome, " + u.name, true);
+            return SCREEN_DASHBOARD;
         }
-
-        attempts++;
-        cout << "  Wrong ID or password. Attempts left: " << 3 - attempts << "\n\n";
+        showMessage("Wrong ID or password.", false);
     }
 
-    cout << "  Too many failed attempts. Going back to main menu.\n";
-    pressEnter();
-    return false;
+    if (role == "Student") {
+        return SCREEN_STUDENT_LOGIN;
+    }
+    return SCREEN_FACULTY_LOGIN;
 }
 
-// ------------------------------------------------------------
-// 4. Student Profile
-// ------------------------------------------------------------
-
-void showProfile(User user) {
-    printTitle("MY PROFILE");
-
-    string hiddenPassword = "";
-    for (int i = 0; i < user.password.length(); i++) {
-        hiddenPassword = hiddenPassword + "*";
+int dashboardScreen(User &user) {
+    drawHeader("Hi, " + user.name, user.role + "  |  ID: " + user.id);
+    if (colorButton("Logout", WIDTH - 140, 17, 115, 36, COLOR_RED)) {
+        showMessage("You have been logged out.", true);
+        return SCREEN_HOME;
     }
 
-    cout << "  Full Name        : " << user.fullName << "\n";
-    cout << "  Student ID       : " << user.studentId << "\n";
-    cout << "  University Email : " << user.email << "\n";
-    cout << "  Department       : " << user.department << "\n";
-    cout << "  Semester         : " << user.semester << "\n";
-    cout << "  Password         : " << hiddenPassword << "\n";
-    cout << "  Role             : " << user.role << "\n";
-    pressEnter();
+    string noticeText = "Read notices, join events";
+    if (user.role == "Faculty") {
+        noticeText = "Post notices, create events";
+    }
+
+    if (tile("My Profile", "View and edit your details", 60, 100, 420, 220, COLOR_PRIMARY)) {
+        return SCREEN_PROFILE;
+    }
+    if (tile("Room Booking", "Book classrooms and labs", 520, 100, 420, 220, COLOR_TEAL)) {
+        return SCREEN_BOOKING;
+    }
+    if (tile("Lost & Found", "Report and find lost items", 60, 345, 420, 220, COLOR_ORANGE)) {
+        return SCREEN_LOSTFOUND;
+    }
+    if (tile("Notices & Events", noticeText, 520, 345, 420, 220, COLOR_PURPLE)) {
+        return SCREEN_NOTICES;
+    }
+    return SCREEN_DASHBOARD;
 }
 
-// ------------------------------------------------------------
-// 5. Profile Edit
-// ------------------------------------------------------------
+bool profileLoaded = false;
+char editName[64] = "";
+char editEmail[64] = "";
+char editDept[64] = "";
+char editSemester[8] = "";
+char oldPassword[32] = "";
+char newPassword[32] = "";
 
-void editProfile(User &user) {
-    while (true) {
-        printTitle("EDIT PROFILE");
-        cout << "  1. Full Name    (" << user.fullName << ")\n";
-        cout << "  2. Email        (" << user.email << ")\n";
-        cout << "  3. Department   (" << user.department << ")\n";
-        cout << "  4. Semester     (" << user.semester << ")\n";
-        cout << "  0. Back\n";
-        printLine();
+int profileScreen(User &user) {
 
-        int choice = inputNumber("Choose what to edit: ");
+    if (!profileLoaded) {
+        strcpy(editName, user.name.c_str());
+        strcpy(editEmail, user.email.c_str());
+        strcpy(editDept, user.department.c_str());
+        strcpy(editSemester, to_string(user.semester).c_str());
+        oldPassword[0] = '\0';
+        newPassword[0] = '\0';
+        profileLoaded = true;
+    }
 
-        if (choice == 0) {
-            return;
-        } else if (choice == 1) {
-            user.fullName = inputText("New Full Name    : ");
-        } else if (choice == 2) {
-            user.email = askEmail(user.studentId);
-        } else if (choice == 3) {
-            user.department = inputText("New Department   : ");
-        } else if (choice == 4) {
-            user.semester = askSemester();
+    drawHeader("My Profile", "");
+    if (backButton()) {
+        profileLoaded = false;
+        return SCREEN_DASHBOARD;
+    }
+
+    drawCard(30, 100, 580, 400);
+    DrawCircle(95, 165, 38, COLOR_PRIMARY);
+    string letter = user.name.substr(0, 1);
+    labelBold(letter, 95 - textWidth(letter, 36) / 2, 147, 36, WHITE);
+    labelBold(user.name, 150, 135, 26, COLOR_TEXT);
+    label("ID: " + user.id + "   |   " + user.role, 150, 172, 18, COLOR_MUTED);
+
+    textField("Full Name", editName, 64, 60, 230, 250, 1);
+    textField("Email", editEmail, 64, 330, 230, 250, 2);
+    textField("Department", editDept, 64, 60, 305, 250, 3);
+    if (user.role == "Student") {
+        textField("Semester", editSemester, 8, 330, 305, 250, 4);
+    }
+
+    if (button("Save Changes", 60, 420, 520, 46)) {
+        string name = editName;
+        string email = editEmail;
+        string dept = editDept;
+
+        if (name == "" || email == "" || dept == "") {
+            showMessage("Fields cannot be empty.", false);
+        } else if (hasBar(name + email + dept)) {
+            showMessage("Do not use the | character.", false);
+        } else if (email.find('@') == string::npos) {
+            showMessage("Email must contain @", false);
+        } else if (user.role == "Student" && (atoi(editSemester) < 1 || atoi(editSemester) > 12)) {
+            showMessage("Semester must be from 1 to 12.", false);
         } else {
-            cout << "  Invalid choice.\n";
-            continue;
+            user.name = name;
+            user.email = email;
+            user.department = dept;
+            if (user.role == "Student") {
+                user.semester = atoi(editSemester);
+            }
+            updateUser(user);
+            showMessage("Profile updated.", true);
         }
-
-        updateUser(user);
-        cout << "  Profile updated successfully.\n";
-        pressEnter();
-    }
-}
-
-// ------------------------------------------------------------
-// 6. Password Management
-// ------------------------------------------------------------
-
-void changePassword(User &user) {
-    printTitle("CHANGE PASSWORD");
-
-    string oldPassword = inputText("Current Password: ");
-    if (oldPassword != user.password) {
-        cout << "  Wrong current password.\n";
-        pressEnter();
-        return;
     }
 
-    user.password = askNewPassword();
-    updateUser(user);
-    cout << "  Password changed successfully.\n";
-    pressEnter();
-}
+    drawCard(630, 100, 340, 320);
+    labelBold("Change Password", 660, 125, 22, COLOR_TEXT);
+    passwordField("Old Password", oldPassword, 32, 660, 170, 280, 5);
+    passwordField("New Password", newPassword, 32, 660, 245, 280, 6);
 
-void profileMenu(User &user) {
-    while (true) {
-        printTitle("PROFILE MENU");
-        cout << "  1. View My Profile\n";
-        cout << "  2. Edit Profile\n";
-        cout << "  3. Change Password\n";
-        cout << "  0. Back\n";
-        printLine();
+    if (colorButton("Change Password", 660, 340, 280, 46, COLOR_ORANGE)) {
+        string newPass = newPassword;
 
-        int choice = inputNumber("Enter choice: ");
-
-        if (choice == 1) {
-            showProfile(user);
-        } else if (choice == 2) {
-            editProfile(user);
-        } else if (choice == 3) {
-            changePassword(user);
-        } else if (choice == 0) {
-            return;
+        if (user.password != oldPassword) {
+            showMessage("Old password is wrong.", false);
+        } else if (newPass.length() < 4) {
+            showMessage("New password must be at least 4 characters.", false);
+        } else if (hasBar(newPass)) {
+            showMessage("Do not use the | character.", false);
         } else {
-            cout << "  Invalid choice.\n";
+            user.password = newPass;
+            updateUser(user);
+            oldPassword[0] = '\0';
+            newPassword[0] = '\0';
+            showMessage("Password changed.", true);
         }
     }
-}
 
-// ------------------------------------------------------------
-// 7. User Role  (Admin only)
-// ------------------------------------------------------------
-
-void showAllUsers() {
-    printTitle("ALL USERS");
-    vector<User> users = loadUsers();
-
-    cout << "  " << left << setw(12) << "ID"
-         << setw(22) << "Name"
-         << setw(16) << "Department"
-         << setw(6) << "Sem"
-         << setw(10) << "Role" << "\n";
-    printLine();
-
-    for (int i = 0; i < users.size(); i++) {
-        cout << "  " << left << setw(12) << users[i].studentId
-             << setw(22) << shortText(users[i].fullName, 21)
-             << setw(16) << shortText(users[i].department, 15)
-             << setw(6) << users[i].semester
-             << setw(10) << users[i].role << "\n";
-    }
-
-    cout << "\n  Total users: " << users.size() << "\n";
-    pressEnter();
-}
-
-void resetUserPassword() {
-    printTitle("RESET A USER'S PASSWORD");
-    string id = inputText("Enter Student ID: ");
-
-    User user;
-    if (!findUser(id, user)) {
-        cout << "  User not found.\n";
-        pressEnter();
-        return;
-    }
-
-    cout << "  Resetting password for " << user.fullName << "\n";
-    user.password = askNewPassword();
-    updateUser(user);
-    cout << "  Password reset successfully.\n";
-    pressEnter();
-}
-
-void changeUserRole(User &admin) {
-    printTitle("CHANGE USER ROLE");
-    string id = inputText("Enter Student ID: ");
-
-    if (id == admin.studentId) {
-        cout << "  You cannot change your own role.\n";
-        pressEnter();
-        return;
-    }
-
-    User user;
-    if (!findUser(id, user)) {
-        cout << "  User not found.\n";
-        pressEnter();
-        return;
-    }
-
-    string newRole = "Admin";
-    if (user.role == "Admin") {
-        newRole = "Student";
-    }
-
-    cout << "  " << user.fullName << " is currently: " << user.role << "\n";
-    string answer = toLowerCase(inputText("Change role to " + newRole + "? (y/n): "));
-
-    if (answer == "y") {
-        user.role = newRole;
-        updateUser(user);
-        cout << "  Role changed to " << newRole << ".\n";
-    } else {
-        cout << "  No change made.\n";
-    }
-    pressEnter();
-}
-
-void manageUsersMenu(User &admin) {
-    while (true) {
-        printTitle("MANAGE USERS (ADMIN)");
-        cout << "  1. View All Users\n";
-        cout << "  2. Reset a User's Password\n";
-        cout << "  3. Change User Role (Student / Admin)\n";
-        cout << "  0. Back\n";
-        printLine();
-
-        int choice = inputNumber("Enter choice: ");
-
-        if (choice == 1) {
-            showAllUsers();
-        } else if (choice == 2) {
-            resetUserPassword();
-        } else if (choice == 3) {
-            changeUserRole(admin);
-        } else if (choice == 0) {
-            return;
-        } else {
-            cout << "  Invalid choice.\n";
-        }
-    }
+    return SCREEN_PROFILE;
 }

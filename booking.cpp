@@ -1,489 +1,226 @@
-// ============================================================
-// booking.cpp   -  MEMBER 2
-// Classroom / Lab Availability & Booking
-// ============================================================
-
 #include "booking.h"
 
-const string ROOMS_FILE = "rooms.txt";
-const string BOOKINGS_FILE = "bookings.txt";
+const int ROOM_COUNT = 5;
+string rooms[ROOM_COUNT] = {"R101", "R102", "L201", "L202", "L203"};
+string roomTypes[ROOM_COUNT] = {"Classroom", "Classroom", "Computer Lab", "Computer Lab", "Physics Lab"};
 
-const int TOTAL_SLOTS = 5;
-const string TIME_SLOTS[TOTAL_SLOTS] = {
-    "08:00-09:30",
-    "09:30-11:00",
-    "11:00-12:30",
-    "14:00-15:30",
-    "15:30-17:00"
-};
-
-// ------------------------------------------------------------
-// File functions
-// rooms.txt    : roomId|roomName|roomType|capacity
-// bookings.txt : bookingId|studentId|roomId|date|slotNumber|purpose|status
-// ------------------------------------------------------------
-
-vector<Room> loadRooms() {
-    vector<Room> rooms;
-    ifstream file(ROOMS_FILE);
-    string line;
-
-    while (getline(file, line)) {
-        if (line == "") {
-            continue;
-        }
-        vector<string> parts = splitLine(line);
-        if (parts.size() < 4) {
-            continue;
-        }
-
-        Room room;
-        room.roomId = parts[0];
-        room.roomName = parts[1];
-        room.roomType = parts[2];
-        room.capacity = stoi(parts[3]);
-        rooms.push_back(room);
-    }
-
-    file.close();
-    return rooms;
-}
-
-void saveRooms(vector<Room> rooms) {
-    ofstream file(ROOMS_FILE);
-    for (int i = 0; i < rooms.size(); i++) {
-        file << rooms[i].roomId << "|"
-             << rooms[i].roomName << "|"
-             << rooms[i].roomType << "|"
-             << rooms[i].capacity << "\n";
-    }
-    file.close();
-}
+const int SLOT_COUNT = 5;
+string slotStart[SLOT_COUNT] = {"08:00", "09:30", "11:00", "14:00", "15:30"};
+string slotEnd[SLOT_COUNT]   = {"09:30", "11:00", "12:30", "15:30", "17:00"};
 
 vector<Booking> loadBookings() {
-    vector<Booking> bookings;
-    ifstream file(BOOKINGS_FILE);
+    vector<Booking> list;
+    ifstream file("bookings.txt");
     string line;
 
     while (getline(file, line)) {
-        if (line == "") {
+        vector<string> p = splitLine(line);
+        if (p.size() < 7) {
             continue;
         }
-        vector<string> parts = splitLine(line);
-        if (parts.size() < 7) {
-            continue;
-        }
-
-        Booking booking;
-        booking.bookingId = stoi(parts[0]);
-        booking.studentId = parts[1];
-        booking.roomId = parts[2];
-        booking.date = parts[3];
-        booking.slotNumber = stoi(parts[4]);
-        booking.purpose = parts[5];
-        booking.status = parts[6];
-        bookings.push_back(booking);
-    }
-
-    file.close();
-    return bookings;
-}
-
-void saveBookings(vector<Booking> bookings) {
-    ofstream file(BOOKINGS_FILE);
-    for (int i = 0; i < bookings.size(); i++) {
-        file << bookings[i].bookingId << "|"
-             << bookings[i].studentId << "|"
-             << bookings[i].roomId << "|"
-             << bookings[i].date << "|"
-             << bookings[i].slotNumber << "|"
-             << bookings[i].purpose << "|"
-             << bookings[i].status << "\n";
+        Booking b;
+        b.id = atoi(p[0].c_str());
+        b.userId = p[1];
+        b.room = p[2];
+        b.date = p[3];
+        b.slot = atoi(p[4].c_str());
+        b.purpose = p[5];
+        b.status = p[6];
+        list.push_back(b);
     }
     file.close();
+    return list;
 }
 
-// Adds some rooms the first time the program runs
-void createDefaultRooms() {
-    vector<Room> rooms = loadRooms();
-    if (rooms.size() > 0) {
-        return;
-    }
-
-    Room r1; r1.roomId = "R101"; r1.roomName = "Classroom 101";   r1.roomType = "Classroom"; r1.capacity = 40;
-    Room r2; r2.roomId = "R102"; r2.roomName = "Classroom 102";   r2.roomType = "Classroom"; r2.capacity = 40;
-    Room r3; r3.roomId = "L201"; r3.roomName = "Computer Lab 1";  r3.roomType = "Lab";       r3.capacity = 30;
-    Room r4; r4.roomId = "L202"; r4.roomName = "Computer Lab 2";  r4.roomType = "Lab";       r4.capacity = 30;
-    Room r5; r5.roomId = "L203"; r5.roomName = "Physics Lab";     r5.roomType = "Lab";       r5.capacity = 25;
-
-    rooms.push_back(r1);
-    rooms.push_back(r2);
-    rooms.push_back(r3);
-    rooms.push_back(r4);
-    rooms.push_back(r5);
-    saveRooms(rooms);
-}
-
-// ------------------------------------------------------------
-// Helper functions
-// ------------------------------------------------------------
-
-bool findRoom(string roomId, Room &foundRoom) {
-    vector<Room> rooms = loadRooms();
-    for (int i = 0; i < rooms.size(); i++) {
-        if (rooms[i].roomId == roomId) {
-            foundRoom = rooms[i];
-            return true;
-        }
-    }
-    return false;
-}
-
-bool isSlotBooked(string roomId, string date, int slotNumber) {
-    vector<Booking> bookings = loadBookings();
-    for (int i = 0; i < bookings.size(); i++) {
-        if (bookings[i].roomId == roomId &&
-            bookings[i].date == date &&
-            bookings[i].slotNumber == slotNumber &&
-            bookings[i].status == "Booked") {
-            return true;
-        }
-    }
-    return false;
-}
-
-void printRoomTable() {
-    vector<Room> rooms = loadRooms();
-
-    cout << "  " << left << setw(10) << "Room ID"
-         << setw(22) << "Name"
-         << setw(12) << "Type"
-         << setw(10) << "Capacity" << "\n";
-    printLine();
-
-    for (int i = 0; i < rooms.size(); i++) {
-        cout << "  " << left << setw(10) << rooms[i].roomId
-             << setw(22) << shortText(rooms[i].roomName, 21)
-             << setw(12) << rooms[i].roomType
-             << setw(10) << rooms[i].capacity << "\n";
-    }
-}
-
-void printBookingTable(vector<Booking> list, bool showStudent) {
-    if (list.size() == 0) {
-        cout << "  No bookings found.\n";
-        return;
-    }
-
-    cout << "  " << left << setw(6) << "ID";
-    if (showStudent) {
-        cout << setw(12) << "Student";
-    }
-    cout << setw(8) << "Room"
-         << setw(13) << "Date"
-         << setw(14) << "Time"
-         << setw(18) << "Purpose"
-         << setw(10) << "Status" << "\n";
-    printLine();
-
+void saveBookings(vector<Booking> list) {
+    ofstream file("bookings.txt");
     for (int i = 0; i < list.size(); i++) {
-        cout << "  " << left << setw(6) << list[i].bookingId;
-        if (showStudent) {
-            cout << setw(12) << list[i].studentId;
-        }
-        cout << setw(8) << list[i].roomId
-             << setw(13) << list[i].date
-             << setw(14) << TIME_SLOTS[list[i].slotNumber - 1]
-             << setw(18) << shortText(list[i].purpose, 17)
-             << setw(10) << list[i].status << "\n";
+        file << list[i].id << "|" << list[i].userId << "|" << list[i].room << "|"
+             << list[i].date << "|" << list[i].slot << "|" << list[i].purpose << "|"
+             << list[i].status << "\n";
     }
+    file.close();
 }
 
-// ------------------------------------------------------------
-// 1. Available Labs / Classrooms
-// ------------------------------------------------------------
-
-void showAllRooms() {
-    printTitle("ALL CLASSROOMS & LABS");
-    printRoomTable();
-    pressEnter();
-}
-
-// ------------------------------------------------------------
-// 2 & 3. Date + Available Time Slots
-// ------------------------------------------------------------
-
-void showAvailability() {
-    printTitle("CHECK AVAILABILITY");
-    string date = inputDate("Enter date (DD-MM-YYYY): ");
-
-    vector<Room> rooms = loadRooms();
-
-    cout << "\n  Availability on " << date << "\n\n";
-    cout << "  " << left << setw(8) << "Room";
-    for (int s = 0; s < TOTAL_SLOTS; s++) {
-        cout << setw(13) << TIME_SLOTS[s];
-    }
-    cout << "\n";
-    printLine();
-
-    for (int i = 0; i < rooms.size(); i++) {
-        cout << "  " << left << setw(8) << rooms[i].roomId;
-        for (int s = 1; s <= TOTAL_SLOTS; s++) {
-            string status = "Free";
-            if (isSlotBooked(rooms[i].roomId, date, s)) {
-                status = "Booked";
-            }
-            cout << setw(13) << status;
-        }
-        cout << "\n";
-    }
-    pressEnter();
-}
-
-// ------------------------------------------------------------
-// 4. Booking Request
-// ------------------------------------------------------------
-
-void bookRoom(User user) {
-    printTitle("BOOK A CLASSROOM / LAB");
-    printRoomTable();
-    cout << "\n";
-
-    string roomId = toUpperCase(inputText("Enter Room ID: "));
-    Room room;
-    if (!findRoom(roomId, room)) {
-        cout << "  Room not found.\n";
-        pressEnter();
-        return;
-    }
-
-    string date = inputDate("Enter date (DD-MM-YYYY): ");
-    if (dateToDays(date) < dateToDays(getTodayDate())) {
-        cout << "  You cannot book a past date.\n";
-        pressEnter();
-        return;
-    }
-
-    cout << "\n  Time slots for " << room.roomName << " on " << date << ":\n";
-    for (int s = 1; s <= TOTAL_SLOTS; s++) {
-        string status = "Free";
-        if (isSlotBooked(room.roomId, date, s)) {
-            status = "Booked";
-        }
-        cout << "  " << s << ". " << TIME_SLOTS[s - 1] << "   - " << status << "\n";
-    }
-
-    int slot = inputNumber("Choose slot number: ");
-    if (slot < 1 || slot > TOTAL_SLOTS) {
-        cout << "  Invalid slot.\n";
-        pressEnter();
-        return;
-    }
-    if (isSlotBooked(room.roomId, date, slot)) {
-        cout << "  Sorry, this slot is already booked.\n";
-        pressEnter();
-        return;
-    }
-
-    string purpose = inputText("Purpose (e.g. Group Study): ");
-
-    vector<Booking> bookings = loadBookings();
-    Booking booking;
-    booking.bookingId = bookings.size() + 1;
-    booking.studentId = user.studentId;
-    booking.roomId = room.roomId;
-    booking.date = date;
-    booking.slotNumber = slot;
-    booking.purpose = purpose;
-    booking.status = "Booked";
-
-    bookings.push_back(booking);
-    saveBookings(bookings);
-
-    cout << "\n  Booking confirmed! Your Booking ID is " << booking.bookingId << ".\n";
-    pressEnter();
-}
-
-// ------------------------------------------------------------
-// 5. Booking History
-// ------------------------------------------------------------
-
-void showMyBookings(User user) {
-    printTitle("MY BOOKING HISTORY");
-
-    vector<Booking> bookings = loadBookings();
-    vector<Booking> myList;
-    for (int i = 0; i < bookings.size(); i++) {
-        if (bookings[i].studentId == user.studentId) {
-            myList.push_back(bookings[i]);
+bool isBooked(vector<Booking> list, string room, string date, int slot) {
+    for (int i = 0; i < list.size(); i++) {
+        if (list[i].room == room && list[i].date == date &&
+            list[i].slot == slot && list[i].status == "Booked") {
+            return true;
         }
     }
-
-    printBookingTable(myList, false);
-    pressEnter();
+    return false;
 }
 
-void showAllBookings() {
-    printTitle("ALL BOOKINGS");
-    printBookingTable(loadBookings(), true);
-    pressEnter();
-}
+bool bookingLoaded = false;
+char bookingDate[16] = "";
+string lastDate = "";
+int selectedRoom = -1;
+int selectedSlot = -1;
+char purpose[64] = "";
+int myBookingPage = 0;
 
-// ------------------------------------------------------------
-// 6. Booking Cancel
-// ------------------------------------------------------------
-
-void cancelBooking(User user, bool isAdmin) {
-    printTitle("CANCEL BOOKING");
-
-    vector<Booking> bookings = loadBookings();
-
-    // show the bookings this person can cancel
-    vector<Booking> showList;
-    for (int i = 0; i < bookings.size(); i++) {
-        if (bookings[i].status == "Booked") {
-            if (isAdmin || bookings[i].studentId == user.studentId) {
-                showList.push_back(bookings[i]);
-            }
-        }
-    }
-    printBookingTable(showList, isAdmin);
-    if (showList.size() == 0) {
-        pressEnter();
-        return;
+int bookingScreen(User &user) {
+    if (!bookingLoaded) {
+        strcpy(bookingDate, getTodayDate().c_str());
+        selectedRoom = -1;
+        selectedSlot = -1;
+        purpose[0] = '\0';
+        myBookingPage = 0;
+        bookingLoaded = true;
     }
 
-    int id = inputNumber("Enter Booking ID to cancel (0 = back): ");
-    if (id == 0) {
-        return;
+    drawHeader("Room Booking", "Classrooms and labs");
+    if (backButton()) {
+        bookingLoaded = false;
+        return SCREEN_DASHBOARD;
     }
 
-    bool found = false;
-    for (int i = 0; i < bookings.size(); i++) {
-        if (bookings[i].bookingId == id) {
-            found = true;
+    vector<Booking> all = loadBookings();
+    string date = bookingDate;
+    string today = getTodayDate();
 
-            if (!isAdmin && bookings[i].studentId != user.studentId) {
-                cout << "  This is not your booking.\n";
-            } else if (bookings[i].status == "Cancelled") {
-                cout << "  This booking is already cancelled.\n";
-            } else if (dateToDays(bookings[i].date) < dateToDays(getTodayDate())) {
-                cout << "  Past bookings cannot be cancelled.\n";
-            } else {
-                bookings[i].status = "Cancelled";
-                saveBookings(bookings);
-                cout << "  Booking cancelled successfully.\n";
-            }
-        }
+    if (date != lastDate) {
+        selectedRoom = -1;
+        selectedSlot = -1;
+        lastDate = date;
     }
 
-    if (!found) {
-        cout << "  Booking ID not found.\n";
-    }
-    pressEnter();
-}
+    drawCard(30, 90, 610, 495);
+    labelBold("Check Availability", 50, 105, 22, COLOR_TEXT);
 
-// ------------------------------------------------------------
-// Admin: add a new room
-// ------------------------------------------------------------
-
-void addRoom() {
-    printTitle("ADD NEW CLASSROOM / LAB");
-
-    Room room;
-    room.roomId = toUpperCase(inputText("Room ID (e.g. L204): "));
-
-    Room temp;
-    if (findRoom(room.roomId, temp)) {
-        cout << "  This Room ID already exists.\n";
-        pressEnter();
-        return;
+    textField("Date (DD-MM-YYYY)", bookingDate, 16, 50, 140, 190, 1);
+    if (colorButton("Today", 250, 162, 80, 38, COLOR_MUTED)) {
+        strcpy(bookingDate, today.c_str());
     }
 
-    room.roomName = inputText("Room Name          : ");
+    DrawRectangleRounded(Rectangle{360, 172, 16, 16}, 0.3f, 4, COLOR_GREEN);
+    label("Free", 382, 171, 16, COLOR_MUTED);
+    DrawRectangleRounded(Rectangle{430, 172, 16, 16}, 0.3f, 4, COLOR_RED);
+    label("Booked", 452, 171, 16, COLOR_MUTED);
+    DrawRectangleRounded(Rectangle{520, 172, 16, 16}, 0.3f, 4, COLOR_PRIMARY);
+    label("Selected", 542, 171, 16, COLOR_MUTED);
 
-    cout << "  1. Classroom\n";
-    cout << "  2. Lab\n";
-    int type = inputNumber("Choose type        : ");
-    if (type == 2) {
-        room.roomType = "Lab";
+    if (!isValidDate(date)) {
+        label("Please type a correct date, like 05-12-2026", 50, 300, 18, COLOR_RED);
     } else {
-        room.roomType = "Classroom";
-    }
 
-    room.capacity = inputNumber("Capacity           : ");
+        for (int s = 0; s < SLOT_COUNT; s++) {
+            float x = 170 + s * 92;
+            labelBold(slotStart[s], x + 20, 220, 16, COLOR_TEXT);
+            label("to " + slotEnd[s], x + 18, 238, 14, COLOR_MUTED);
+        }
 
-    vector<Room> rooms = loadRooms();
-    rooms.push_back(room);
-    saveRooms(rooms);
+        for (int r = 0; r < ROOM_COUNT; r++) {
+            float y = 265 + r * 48;
+            labelBold(rooms[r], 50, y + 2, 18, COLOR_TEXT);
+            label(roomTypes[r], 50, y + 22, 13, COLOR_MUTED);
 
-    cout << "  Room added successfully.\n";
-    pressEnter();
-}
+            for (int s = 1; s <= SLOT_COUNT; s++) {
+                float x = 170 + (s - 1) * 92;
 
-// ------------------------------------------------------------
-// Menus
-// ------------------------------------------------------------
-
-void bookingMenuStudent(User user) {
-    while (true) {
-        printTitle("CLASSROOM / LAB BOOKING");
-        cout << "  1. View All Classrooms & Labs\n";
-        cout << "  2. Check Availability (by date)\n";
-        cout << "  3. Book a Classroom / Lab\n";
-        cout << "  4. My Booking History\n";
-        cout << "  5. Cancel a Booking\n";
-        cout << "  0. Back\n";
-        printLine();
-
-        int choice = inputNumber("Enter choice: ");
-
-        if (choice == 1) {
-            showAllRooms();
-        } else if (choice == 2) {
-            showAvailability();
-        } else if (choice == 3) {
-            bookRoom(user);
-        } else if (choice == 4) {
-            showMyBookings(user);
-        } else if (choice == 5) {
-            cancelBooking(user, false);
-        } else if (choice == 0) {
-            return;
-        } else {
-            cout << "  Invalid choice.\n";
+                if (isBooked(all, rooms[r], date, s)) {
+                    DrawRectangleRounded(Rectangle{x, y, 86, 40}, 0.3f, 16, COLOR_RED);
+                    labelBold("Booked", x + 43 - textWidth("Booked", 16) / 2, y + 11, 16, WHITE);
+                } else if (r == selectedRoom && s == selectedSlot) {
+                    colorButton("Selected", x, y, 86, 40, COLOR_PRIMARY);
+                } else if (colorButton("Free", x, y, 86, 40, COLOR_GREEN)) {
+                    if (dateToNumber(date) < dateToNumber(today)) {
+                        showMessage("You cannot book a past date.", false);
+                    } else {
+                        selectedRoom = r;
+                        selectedSlot = s;
+                    }
+                }
+            }
         }
     }
-}
 
-void bookingMenuAdmin(User user) {
-    while (true) {
-        printTitle("ROOMS & BOOKINGS (ADMIN)");
-        cout << "  1. View All Classrooms & Labs\n";
-        cout << "  2. Add New Classroom / Lab\n";
-        cout << "  3. Check Availability (by date)\n";
-        cout << "  4. View All Bookings\n";
-        cout << "  5. Cancel Any Booking\n";
-        cout << "  0. Back\n";
-        printLine();
+    string purposeTitle = "Purpose  (click a green box first)";
+    if (selectedRoom != -1) {
+        purposeTitle = "Purpose for " + rooms[selectedRoom] + ", " +
+                       slotStart[selectedSlot - 1] + " - " + slotEnd[selectedSlot - 1];
+    }
+    textField(purposeTitle, purpose, 64, 50, 505, 360, 2);
 
-        int choice = inputNumber("Enter choice: ");
+    if (button("Book Now", 425, 527, 195, 38)) {
+        string text = purpose;
 
-        if (choice == 1) {
-            showAllRooms();
-        } else if (choice == 2) {
-            addRoom();
-        } else if (choice == 3) {
-            showAvailability();
-        } else if (choice == 4) {
-            showAllBookings();
-        } else if (choice == 5) {
-            cancelBooking(user, true);
-        } else if (choice == 0) {
-            return;
+        if (selectedRoom == -1) {
+            showMessage("Click a green box to choose a room and time.", false);
+        } else if (text == "") {
+            showMessage("Please write the purpose.", false);
+        } else if (text.find('|') != string::npos) {
+            showMessage("Do not use the | character.", false);
+        } else if (isBooked(all, rooms[selectedRoom], date, selectedSlot)) {
+            showMessage("This slot is already booked.", false);
         } else {
-            cout << "  Invalid choice.\n";
+            Booking b;
+            b.id = all.size() + 1;
+            b.userId = user.id;
+            b.room = rooms[selectedRoom];
+            b.date = date;
+            b.slot = selectedSlot;
+            b.purpose = text;
+            b.status = "Booked";
+
+            all.push_back(b);
+            saveBookings(all);
+
+            selectedRoom = -1;
+            selectedSlot = -1;
+            purpose[0] = '\0';
+            showMessage("Booking done! Booking ID: " + to_string(b.id), true);
         }
     }
+
+    drawCard(660, 90, 310, 495);
+    labelBold("My Bookings", 680, 105, 22, COLOR_TEXT);
+
+    vector<Booking> mine;
+    for (int i = all.size() - 1; i >= 0; i--) {
+        if (all[i].userId == user.id) {
+            mine.push_back(all[i]);
+        }
+    }
+
+    if (mine.size() == 0) {
+        label("No bookings yet.", 680, 150, 18, COLOR_MUTED);
+    }
+
+    int perPage = 4;
+    pager(myBookingPage, mine.size(), perPage, 670, 540);
+
+    for (int k = 0; k < perPage; k++) {
+        int i = myBookingPage * perPage + k;
+        if (i >= mine.size()) {
+            break;
+        }
+        Booking b = mine[i];
+        float y = 145 + k * 98;
+
+        labelBold(b.room, 680, y, 20, COLOR_TEXT);
+        if (b.status == "Booked") {
+            label("Booked", 880, y + 2, 16, COLOR_GREEN);
+        } else {
+            label("Cancelled", 870, y + 2, 16, COLOR_RED);
+        }
+        label(b.date + "   " + slotStart[b.slot - 1] + "-" + slotEnd[b.slot - 1], 680, y + 27, 16, COLOR_MUTED);
+        label(fitText(b.purpose, 16, 170), 680, y + 50, 16, COLOR_TEXT);
+
+        bool canCancel = b.status == "Booked" && dateToNumber(b.date) >= dateToNumber(today);
+        if (canCancel && colorButton("Cancel", 870, y + 42, 85, 30, COLOR_RED)) {
+            for (int j = 0; j < all.size(); j++) {
+                if (all[j].id == b.id) {
+                    all[j].status = "Cancelled";
+                }
+            }
+            saveBookings(all);
+            showMessage("Booking cancelled.", true);
+        }
+
+        DrawLine(680, y + 85, 950, y + 85, COLOR_LINE);
+    }
+
+    return SCREEN_BOOKING;
 }

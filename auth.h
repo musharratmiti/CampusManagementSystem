@@ -1,9 +1,3 @@
-// ============================================================
-// auth.h   -  MEMBER 1
-// Student Registration, Login, Logout, Profile,
-// Profile Edit, Password Management, User Role
-// ============================================================
-
 #ifndef AUTH_H
 #define AUTH_H
 
@@ -11,31 +5,21 @@
 
 class User {
 public:
-    string studentId;
-    string fullName;
+    string id;
+    string name;
     string email;
     string department;
     int semester;
     string password;
-    string role;          // "Student" or "Admin"
+    string role;
 };
 
-// file functions
-vector<User> loadUsers();
-void saveUsers(vector<User> users);
-void updateUser(User user);
-bool findUser(string studentId, User &foundUser);
-void createDefaultAdmin();
+bool findUser(string id, User &user);
 
-// features
-void registerStudent();
-bool loginUser(User &loggedUser);
-void showProfile(User user);
-void editProfile(User &user);
-void changePassword(User &user);
-
-// menus
-void profileMenu(User &user);
-void manageUsersMenu(User &admin);
+int homeScreen();
+int registerScreen();
+int loginScreen(User &user, string role);
+int dashboardScreen(User &user);
+int profileScreen(User &user);
 
 #endif
