@@ -1,6 +1,5 @@
-Prothom bar just nijer ta run dibe copy kore
+
  g++ main.cpp common.cpp auth.cpp booking.cpp lostfound.cpp notice.cpp -o campus.exe -I raylib/include -L raylib/lib -lraylib -lopengl32 -lgdi32 -lwinmm -static -mwindows
 
-tar por protibar code run dite just eita likhe enter dile hobe
    .\campus.exe
 
